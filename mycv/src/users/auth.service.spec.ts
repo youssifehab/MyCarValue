@@ -9,10 +9,18 @@ describe('AuthService', () => {
   let fakeUsersService: Partial<UsersService>;
 
   beforeEach(async () => {
+    const users: User[] = [];
+
     fakeUsersService = {
-      find: () => Promise.resolve([]),
-      create: (email: string, password: string) =>
-        Promise.resolve({ id: 1, email, password } as User),
+      find: (email: string) => {
+        const filterdUsers = users.filter((user) => user.email === email);
+        return Promise.resolve(filterdUsers);
+      },
+      create: (email: string, password: string) => {
+        const user = { id: Math.random() * 9999, email, password } as User;
+        users.push(user);
+        return Promise.resolve(user);
+      },
     };
 
     const module = await Test.createTestingModule({
@@ -53,13 +61,35 @@ describe('AuthService', () => {
     expect(user).rejects.toThrow(NotFoundException);
   });
 
-  //   it('throws if an invalid password is provided', async () => {
-  //     fakeUsersService.find = () =>
-  //       Promise.resolve([
-  //         { email: 'asdf@asdf.com', password: 'laskdjf' } as User,
-  //       ]);
-  //     await expect(
-  //       service.signin('laskdjf@alskdfj.com', 'passowrd'),
-  //     ).rejects.toThrow(BadRequestException);
-  //   });
+  it('throws if an invalid password is provided', async () => {
+    fakeUsersService.find = () =>
+      Promise.resolve([{ email: 'Ali@gmail.com', password: '123' } as User]);
+    const user = service.signin('Ali@gmail.com', '12345');
+    expect(user).rejects.toThrow(BadRequestException);
+  });
+
+  it('returns user if correct username & password', async () => {
+    await service.signup('Ali@gmail.com', '123');
+    await expect(service.signin('Ali@gmail.com', '123')).toBeDefined();
+  });
+
+  it('throws an error if user signs up with email that is in use', async () => {
+    await service.signup('hi@gmail.com', '123');
+    await expect(service.signup('hi@gmail.com', '123')).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('throws if signin is called with an unused email', async () => {
+    await expect(service.signin('hi@gmail.com', '123')).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it('throws if an invalid password is provided', async () => {
+    await service.signup('hi@gmail.com', '123');
+    await expect(service.signin('hi@gmail.com', '1233')).rejects.toThrow(
+      BadRequestException,
+    );
+  });
 });
